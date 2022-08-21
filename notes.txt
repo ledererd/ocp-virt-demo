@@ -1,0 +1,3 @@
+# Grab the password of a VM:
+oc get vm fedora-toxic-bass -n default  -o json | jq -r '.spec.template.spec.volumes[].cloudInitNoCloud.userData'
+
