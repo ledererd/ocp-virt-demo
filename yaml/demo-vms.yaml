@@ -1,0 +1,178 @@
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: ephemeral-fedora
+  labels:
+    app: ephemeral-fedora
+    os.template.kubevirt.io/fedora35: 'true'
+    flavor.template.kubevirt.io/small: 'true'
+    vm.kubevirt.io/template: fedora-server-small
+    workload.template.kubevirt.io/server: 'true'
+  annotations:
+    name.os.template.kubevirt.io/fedora35: Fedora 35
+    description: VM example
+  namespace: default
+spec:
+  running: true
+  template:
+    metadata:
+      annotations:
+        vm.kubevirt.io/flavor: small
+        vm.kubevirt.io/os: fedora
+        vm.kubevirt.io/workload: server
+      labels:
+        flavor.template.kubevirt.io/small: 'true'
+        kubevirt.io/domain: ephemeral-fedora
+        kubevirt.io/size: small
+        vm.kubevirt.io/name: ephemeral-fedora
+        os.template.kubevirt.io/fedora35: 'true'
+        workload.template.kubevirt.io/server: 'true'
+    spec:
+      domain:
+        cpu:
+          cores: 1
+          sockets: 1
+          threads: 1
+        devices:
+          disks:
+            - bootOrder: 1
+              disk:
+                bus: virtio
+              name: containerdisk
+            - disk:
+                bus: virtio
+              name: cloudinitdisk
+          interfaces:
+            - masquerade: {}
+              name: default
+              model: virtio
+          networkInterfaceMultiqueue: true
+          rng: {}
+        resources:
+          requests:
+            memory: 2G
+          limits:
+            memory: 2G
+      hostname: ephemeral-fedora
+      networks:
+        - name: default
+          pod: {}
+      terminationGracePeriodSeconds: 0
+      volumes:
+        - containerDisk:
+            image: 'quay.io/containerdisks/fedora:35'
+          name: containerdisk
+        - cloudInitNoCloud:
+            userData: |-
+              #cloud-config
+              user: fedora
+              password: fedora
+              chpasswd: { expire: False }
+          name: cloudinitdisk
+
+---
+
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  annotations:
+    kubevirt.io/latest-observed-api-version: v1
+    kubevirt.io/storage-observed-api-version: v1alpha3
+    name.os.template.kubevirt.io/fedora35: Fedora 34 or higher
+  name: persistent-fedora
+  namespace: default
+  labels:
+    app: persistent-fedora
+    flavor.template.kubevirt.io/large: 'true'
+    os.template.kubevirt.io/fedora35: 'true'
+    vm.kubevirt.io/template: fedora-server-small
+    vm.kubevirt.io/template.namespace: openshift
+    vm.kubevirt.io/template.revision: '1'
+    vm.kubevirt.io/template.version: v0.19.6
+    workload.template.kubevirt.io/server: 'true'
+spec:
+  dataVolumeTemplates:
+    - apiVersion: cdi.kubevirt.io/v1beta1
+      kind: DataVolume
+      metadata:
+        creationTimestamp: null
+        name: persistent-fedora
+      spec:
+        sourceRef:
+          kind: DataSource
+          name: fedora
+          namespace: openshift-virtualization-os-images
+        storage:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: '32212254720'
+          storageClassName: gp2
+          volumeMode: Block
+  running: true
+  template:
+    metadata:
+      annotations:
+        vm.kubevirt.io/flavor: small
+        vm.kubevirt.io/os: fedora
+        vm.kubevirt.io/workload: server
+      labels:
+        flavor.template.kubevirt.io/large: 'true'
+        kubevirt.io/domain: persistent-fedora
+        kubevirt.io/size: small
+        os.template.kubevirt.io/fedora35: 'true'
+        vm.kubevirt.io/name: persistent-fedora
+        workload.template.kubevirt.io/server: 'true'
+    spec:
+      accessCredentials:
+        - sshPublicKey:
+            propagationMethod:
+              configDrive: {}
+            source:
+              secret:
+                secretName: my-pub-key
+      domain:
+        cpu:
+          cores: 1
+          sockets: 1
+          threads: 1
+        devices:
+          disks:
+            - bootOrder: 1
+              disk:
+                bus: virtio
+              name: persistent-fedora
+            - disk:
+                bus: virtio
+              name: cloudinitdisk
+          interfaces:
+            - model: virtio
+              masquerade: {}
+              name: default
+          networkInterfaceMultiqueue: true
+          rng: {}
+        machine:
+          type: pc-q35-rhel8.4.0
+        resources:
+          requests:
+            memory: 2Gi
+          limits:
+            memory: 2Gi
+      evictionStrategy: LiveMigrate
+      hostname: persistent-fedora
+      networks:
+        - name: default
+          pod: {}
+      terminationGracePeriodSeconds: 180
+      volumes:
+        - dataVolume:
+            name: persistent-fedora
+          name: persistent-fedora
+        - cloudInitConfigDrive:
+            userData: |-
+              #cloud-config
+              user: fedora
+              password: fedora
+              chpasswd: { expire: False }
+          name: cloudinitdisk
